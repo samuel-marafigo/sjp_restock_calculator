@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Calculadora de pedido - SJP</title>
+    <script src="https://cdn.jsdelivr.net/npm/danfojs@1.1.2/lib/bundle.min.js"></script> <!-- Utilizando DanfoJS-->
+    <style>
+        /* Para fazer com que a tabela ocupe a página inteira */
+        #dfTabela {
+            max-height: 5000px; 
+        }
+    </style>
+</head>
+<body>
+    <input type="file" id="fileInput" accept=".csv">
+    <button id="processBtn">Calcular</button>
+    <br>
+    <label for="multiplierInput">Pedido para </label>
+    <input type="number" id="multiplierInput" value="14" min="1" max="100" step="1"> dias
+    
+    <a id="downloadLink" style="display:none;">Baixar resultado em csv</a>
+    <div id="dfTabela"></div>
+
+    <script>
+        window.addEventListener('load', () => {
+            document.getElementById('processBtn').addEventListener('click', processFiles);
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            processFiles();
+        });
+
+        async function processFiles() {
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput.files.length === 0) {
+                alert('Please select all files.');
+                return;
+            }
+
+            //Tratando o arquivo csv exportado do sistema
+            const uploadedFile = fileInput.files[0];
+            const fileContent = await uploadedFile.text();
+            const cleanedContent = fileContent.replace(/\./g, '').replace(/,00/g, ''); //Excluindo todos os '.' e ',00' para evitar problemas com decimais (só há nºs inteiros)
+            const cleanedBlob = new Blob([cleanedContent], {type: "text/csv"});
+            let dfSaldoDeEstoque = await dfd.readCSV(cleanedBlob, {separator: ";"});
+            dfSaldoDeEstoque.drop({columns: ["Quantidade"], axis: 1, inplace: true}); //No csv exportado a col "Quantidade" ([1]) fica desalinhada dos seus valores, que estão na próxima coluna ([2])
+            dfSaldoDeEstoque.columns[1] = 'quantidade_em_estoque';
+
+            
+
+            let dflistaReferencia = await dfd.readCSV(new Blob([listaReferencia]), {type: "text/csv", separator: ";"});
+
+            
+
+            let dfMerged = dfd.merge({
+                left: dflistaReferencia, 
+                right: dfSaldoDeEstoque, 
+                on: ["Un"], 
+                how: "left"
+            });
+
+            dfMerged = dfMerged.fillNa(0);
+            const multiplier = parseInt(document.getElementById('multiplierInput').value);
+            if (isNaN(multiplier) || multiplier < 1 || multiplier > 100) {
+                alert('O número precisa ser entre 1 e 100.');
+                return;
+            }
+            dfMerged.addColumn('pedido', dfMerged['consumo_medio'].mul(multiplier).sub(dfMerged['quantidade_em_estoque']), {inplace: true});
+            let dfFinal = dfMerged.drop({columns: ['Un']}).fillNa(0);
+            dfFinal = dfFinal.sortValues("pedido", {ascending: false});
+
+            // Criar a tabela
+            dfFinal.plot("dfTabela").table();
+
+            // Transformar o resultado em CSV para dar a opção de baixar.
+            const csv = dfd.toCSV(dfFinal, {sep: ";"});
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const downloadLink = document.getElementById('downloadLink');
+            downloadLink.href = url;
+            downloadLink.download = 'pedido.csv';
+            downloadLink.style.display = 'block';
+            downloadLink.textContent = 'Baixar resultado';
+        }
+
+let listaReferencia = `Un;consumo_medio;insumo_nome_completo
+100416;34;100416 - ACICLOVIR - 200mg - Comprimido
+100908;1;100908 - ACICLOVIR - 50mg/g - Creme
+100418;646;100418 - ÁCIDO ACETILSALICÍLICO - 100mg - Comprimido
+100423;64;100423 - ÁCIDO FÓLICO - 5mg - Comprimido
+100422;0;100422 - ÁCIDO FÓLICO - 0,2mg/mL - Solução oral
+100436;3;100436 - ALBENDAZOL - 400mg - Comprimido
+114942;2;114942 - ALBENDAZOL - 40mg/mL - Suspensão oral
+100438;12;100438 - ALENDRONATO SÓDICO - 70mg - Comprimido
+100442;80;100442 - ALOPURINOL - 300mg - Comprimido
+100451;40;100451 - AMIODARONA, cloridrato de - 200mg - Comprimido
+100453;625;100453 - AMITRIPTILINA, cloridrato de - 25mg - Comprimido
+100455;77;100455 - AMOXICILINA - 500mg - Cápsula
+100454;1;100454 - AMOXICILINA - 50mg/mL - Suspensão oral
+100459;30;100459 - AMOXICILINA + CLAVULANATO DE POTÁSSIO - 500mg+125mg - Comprimido
+100457;1;100457 - AMOXICILINA + CLAVULANATO DE POTÁSSIO - 50mg + 12,5mg/mL - Suspensão oral
+100465;1009;100465 - ANLODIPINO, besilato de - 5mg - Comprimido
+100466;260;100466 - ATENOLOL - 50mg - Comprimido
+100470;7;100470 - AZITROMICINA - 500mg - Comprimido
+100472;1;100472 - AZITROMICINA - 40mg/mL - Suspensão oral
+100476;2;100476 - BECLOMETASONA, dipropionato - 250mcg/dose - Aerossol oral
+100487;71;100487 - BIPERIDENO, cloridrato de - 2mg - Comprimido
+100492;2;100492 - BROMOPRIDA - 4mg/mL - Solução oral
+100495;2;100495 - BUDESONIDA - 32mcg - Spray nasal
+100496;2;100496 - BUDESONIDA - 64mcg - Spray nasal
+133597;39;133597 - BUTILESCOPOLAMINA - 10mg - Comprimido
+100506;428;100506 - CARBAMAZEPINA - 200mg - Comprimido
+100505;1;100505 - CARBAMAZEPINA - 20mg/mL - Suspensão oral
+134233;228;134233 - CARBONATO DE CÁLCIO + VIT. D - 600mg de cálcio + 400UI - Comprimido
+100510;231;100510 - CARBONATO DE LÍTIO - 300mg - Comprimido
+100514;272;100514 - CARVEDILOL - 6,25mg - Comprimido
+100513;262;100513 - CARVEDILOL - 12,5mg - Comprimido
+100515;48;100515 - CEFALEXINA - 500mg - Cápsula/Comprimido
+100516;1;100516 - CEFALEXINA - 50mg/mL - Suspensão oral
+114946;1;114946 - CETOCONAZOL - 20mg/mL - Xampu
+100537;21;100537 - CIPROFLOXACINO, cloridrato de - 500mg - Comprimido
+100536;1;100536 - CIPROFLOXACINO - 3,5mg/ml - Solução oftálmica
+134474;1;134474 - CIPROFLOXACINO + DEXAMETASONA - 3,5mg+1mg - Pomada oftálmica
+100539;4;100539 - CLARITROMICINA - 500mg - Comprimido
+100545;4;100545 - CLONAZEPAM - 2,5mg/mL - Solução oral
+100547;40;100547 - CLONIDINA, cloridrato de - 0,150mg - Comprimido
+100564;59;100564 - CLORPROMAZINA, cloridrato de - 25mg - Comprimido
+100563;72;100563 - CLORPROMAZINA, cloridrato de - 100mg - Comprimido
+135050;83;135050 - CODEINA - 30mg - Comprimido
+100577;2;100577 - DEXAMETASONA - 1mg/g - Creme dermatológico
+134475;1;134475 - DEXAMETASONA - 0,1% - Suspensão oftálmica
+105612;1;105612 - DEXAMETASONA - 4 mg - Comprimido
+100580;35;100580 - DEXCLORFENIRAMINA, maleato - 0,4mg/mL - Solução oral
+100583;149;100583 - DIAZEPAM - 5mg - Comprimido
+100587;22;100587 - DIGOXINA - 0,25mg - Comprimido
+100596;9;100596 - DIPIRONA SÓDICA gotas - 500mg/mL - Solução oral
+101429;13;101429 - DIPIRONA SÓDICA - 500 mg - Comprimido
+105415;210;105415 - DOXAZOSINA, mesilato de - 2mg - Comprimido
+100606;695;100606 - ENALAPRIL , maleato de - 20mg - Comprimido
+133412;18;133412 - ESPINHEIRA SANTA(Maytenusilicifolia) - 13 a 20mg de taninos totais - Cápsula
+100615;203;100615 - ESPIRONOLACTONA - 25mg - Comprimido
+114948;1;114948 - ESTRIOL - 1mg/g - Creme vaginal
+100626;80;100626 - FENITOÍNA SÓDICA - 100mg - Comprimido
+100628;94;100628 - FENOBARBITAL - 100mg - Comprimido
+100630;1;100630 - FENOBARBITAL gotas - 40mg/mL - Solução oral
+105416;49;105416 - FINASTERIDA - 5mg - Comprimido
+134470;1;134470 - FOSFOMICINA TROMETAMOL 5,631G - Equivalente a 3g de Fosfomicina - Envelope
+100635;3;100635 - FLUCONAZOL - 150mg - Cápsula
+100639;627;100639 - FLUOXETINA, cloridrato de - 20mg - Cápsula
+100646;204;100646 - FUROSEMIDA - 40mg - Comprimido
+135048;144;135048 - GABAPENTINA - 300mg - Comprimido
+100651;1;100651 - GENTAMICINA, sulfato de - 5mg/mL - Colírio
+100652;62;100652 - GLIBENCLAMIDA - 5mg - Comprimido
+100655;677;100655 - GLICLAZIDA - 30mg - Comprimido
+114949;2;114949 - GUACO (Mikania glomerata) - 0,5mg a 5mg de cumarina - Solução oral/ xarope
+100664;13;100664 - HALOPERIDOL - 1mg - Comprimido
+100663;58;100663 - HALOPERIDOL - 5mg - Comprimido
+100667;2;100667 - HALOPERIDOL DECANOATO - 70,52mg/mL (equivalente a 50mg de Haloperidol) - Solução injetável
+100665;1;100665 - HALOPERIDOL gotas - 2mg/mL - Solução oral
+100673;656;100673 - HIDROCLOROTIAZIDA - 25mg - Comprimido
+100677;1;100677 - HIDRÓXIDO DE ALUMÍNIO - 61,5mg/mL - Suspensão oral
+100682;2;100682 - IBUPROFENO - 50mg/mL - Suspensão oral
+100683;207;100683 - IBUPROFENO - 600mg - Comprimido revestido
+100685;29;100685 - IMIPRAMINA - 25mg - Comprimido revestido
+114950;34;114950 - ISOFLAVONA DE SOJA (Glycine Max) - 150mg de isoflavonas - Cápsula
+100699;8;100699 - ISOSSORBIDA, mononitrato de - 20mg - Comprimido
+100703;2;100703 - IVERMECTINA - 6mg - Comprimido
+100704;2;100704 - LACTULOSE - 667mg/mL - Xarope
+100507;5;100507 - LEVODOPA + CARBIDOPA - 250mg + 25mg - Comprimido
+100707;37;100707 - LEVODOPA + BENSERAZIDA - 200mg + 50mg - Comprimido
+100706;31;100706 - LEVODOPA + BENSERAZIDA - 100mg + 25mg - Comprimido dispersível
+100705;19;100705 - LEVODOPA + BENSERAZIDA HBS - 100mg + 25mg - Cápsula de liberação controlada
+100710;2;100710 - LEVOMEPROMAZINA, maleato de - 4% - Solução oral
+100711;1;100711 - LEVONORGESTREL - 0,75mg - Comprimido
+100713;1;100713 - LEVONORGESTREL+ETINILESTRADIOL - 0,15mg + 0,03mg - Comprimido
+100714;156;100714 - LEVOTIROXINA SÓDICA - 100mcg - Comprimido
+100716;273;100716 - LEVOTIROXINA SÓDICA - 50mcg - Comprimido
+100715;263;100715 - LEVOTIROXINA SÓDICA - 25mcg - Comprimido
+100723;57;100723 - LORATADINA - 10mg - Comprimido
+100724;1;100724 - LORATADINA - 1mg/mL - Solução oral/xarope
+100726;1722;100726 - LOSARTANA POTÁSSICA - 50mg - Comprimido revestido
+135057;11;135057 - METADONA - 10mg - Comprimido
+135055;1;135055 - METADONA - 10mg/mL - Solução injetável
+100733;563;100733 - METFORMINA, cloridrato de - 850mg - Comprimido
+100734;32;100734 - METILDOPA - 250mg - Comprimido
+100737;0;100737 - METILFENIDATO - 10mg - Comprimido
+109968;48;109968 - METOCLOPRAMIDA, cloridratode - 10mg - Comprimido
+100742;1;100742 - METOPROLOL , tartarato - 100mg - Comprimido revestido
+100937;0;100937 - METOPROLOL , Succinato - 50mg - Comprimido revestido
+100745;27;100745 - METRONIDAZOL - 250mg - Comprimido
+100744;1;100744 - METRONIDAZOL - 100mg/g - Gel vaginal
+100747;1;100747 - METRONIDAZOL - 40mg/mL - Solução oral
+100749;1;100749 - MICONAZOL, nitrato de - 20mg/g - Creme vaginal
+135049;4;135049 - MORFINA - 10mg - Comprimido
+135056;1;135056 - MORFINA - 10mg/mL - Solução injetável
+135051;8;135051 - MORFINA - 30mg - Comprimido
+100763;1;100763 - NEOMICINA+BACITRACINA - 5mg/g+250UI/g - Pomada
+100766;5;100766 - NIFEDIPINO - 10mg - Comprimido
+100772;1;100772 - NISTATINA - 10000UI/mL - Suspensão oral
+100774;15;100774 - NITROFURANTOINA - 100mg - Cápsula
+100778;1;100778 - NORETISTERONA - 0,35mg - Comprimido
+100780;28;100780 - NORTRIPTILINA - 25mg - Cápsula
+100783;2;100783 - ÓLEO MINERAL - nan - Óleo
+100784;757;100784 - OMEPRAZOL - 20mg - Cápsula
+100791;2;100791 - PARACETAMOL - 200mg/mL - Solução oral
+100792;476;100792 - PARACETAMOL - 500mg - Comprimido
+100798;1;100798 - PERMETRINA loção - 5% - Loção
+100797;1;100797 - PERMETRINA solução tópica - 1% - Solução tópica
+100812;2;100812 - PREDNISOLONA, fosfato sódico de - 4,02 mg/ ml (equivalente a 3mg/mL) - Suspensão oral
+100813;43;100813 - PREDNISONA - 5mg - Comprimido
+100815;36;100815 - PREDNISONA - 20mg - Comprimido
+100818;317;100818 - PROMETAZINA, cloridrato de - 25mg - Comprimido
+100820;0;100820 - PROPILTIOURACIL - 100mg - Comprimido
+100822;123;100822 - PROPRANOLOL, cloridrato de - 40mg - Comprimido
+100411;9;100411 - RETINOL+ ERGOCALCIFEROL (VIT A+D) - 5000UI + 1000UI/mL - Solução oral
+100835;3;100835 - SAIS DE REIDRATAÇÃO ORAL - nan - Pó
+100837;3;100837 - SALBUTAMOL, sulfato de - 120,5mcg/dose (equivalente a 100mcg/dose de salbutamol) - Aerossol oral
+103742;822;103742 - SERTRALINA - 50mg - Comprimido
+100843;1384;100843 - SINVASTATINA - 20mg - Comprimido
+100849;13;100849 - SULFAMETOXAZOL + TRIMETOPRIMA - 400mg+ 80mg - Comprimido
+100848;1;100848 - SULFAMETOXAZOL + TRIMETOPRIMA - (40mg+ 8mg)/mL - Suspensão oral
+100855;201;100855 - SULFATO FERROSO - 40mg - Comprimido
+100854;1;100854 - SULFATO FERROSO - 25mg/mL - Solução oral
+100864;80;100864 - TIAMINA - 300mg - Comprimido
+100867;1;100867 - TIMOLOL, maleato de - 5mg/mL - Colírio
+100430;3;100430 - VALPROATO DE SÓDIO - 57,624mg/mL (equivalente a 50mg de ác. valpróico/mL) - Solução oral
+100429;240;100429 - VALPROATO DE SÓDIO - 288mg (equivalente a 250mg de ácido valpróico) - Cápsula
+100431;135;100431 - VALPROATO DE SÓDIO - 576mg (equivalente a 500mg de ácido valpróico) - Comprimido
+103374;26;103374 - VARFARINA SÓDICA - 5mg - Comprimido
+100881;17;100881 - VERAPAMIL - 80mg - Comprimido
+116022;12;116022 - BUPROPIONA, cloridrato de - 150mg - Comprimido
+100602;3;100602 - DOXICICLINA - 100mg - Drágea
+100612;1;100612 - ESPIRAMICINA - 150000 UI (equivalente a 500mg de espiramicina) - Comprimido
+108507;1;108507 - FOLINATO DE CÁLCIO - 5mg - Comprimido
+100426;1;100426 - ÁCIDO FOLÍNICO - 2mg/mL - Solução oral
+100690;2;100690 - INSULINA HUMANA NPH Frasco - 100UI/ mL - Suspensão injetável
+100689;1;100689 - INSULINA HUMANA REGULAR Frasco - 100UI/ mL - Suspensão injetável
+133378;52;133378 - INSULINA HUMANA NPH - CANETA - 100UI/ mL - Suspensão injetável
+133377;8;133377 - INSULINA HUMANA REGULAR - CANETA - 100UI/ mL - Suspensão injetável
+131625;7;131625 - ISONIAZIDA - 100mg - Comprimido
+136092;1;136092 - ISONIAZIDA - 300mg - Comprimido
+118973;1;118973 - NICOTINA - 7mg - Adesivo
+118975;1;118975 - NICOTINA - 14mg - Adesivo
+118974;2;118974 - NICOTINA - 21mg - Adesivo
+100803;1;100803 - PIRIMETAMINA - 2 mg/mL - Solução oral
+119856;1;119856 - PIRIMETAMINA - 25mg - Comprimido
+131618;3;131618 - RIFAMPICINA+ISONIAZIDA - 150mg+75mg - Comprimido
+137170;4;137170 - RIFAMPICINA+ISONIAZIDA - 300mg+150 mg - Comprimido
+137222;1;137222 - RIFAPENTINA - 150 mg - Comprimido
+131616;13;131616 - RIFAMPICINA+ISONIAZIDA+ PIRAZINAMIDA+ETAMBUTOL (RIPE) - 150mg+75mg+40 0mg+ 275mg - Comprimido
+100845;1;100845 - SULFADIAZINA - 500 mg - Comprimido
+100846;1;100846 - SULFADIAZINA - 100 mg/mL - Solução oral
+104716;1;104716 - TRAVOPROSTA - 0,4mg/ml - Colírio
+104712;1;104712 - BIMATOPROSTA - 0,3mg/ml - Colírio
+134519;1;134519 - BRIMONIDINA - 0,2% - Colírio
+137733;1;137733 - NIRMATRELVIR+RITONAVIR - 150mg+100mg - Comprimido
+131683;1;131683 - OSELTAMIVIR - 30mg - Cápsula
+131685;1;131685 - OSELTAMIVIR - 45mg - Cápsula
+131684;4;131684 - OSELTAMIVIR - 75mg - Cápsula
+100479;2;100479 - BENZILPENICILINA BENZATINA - 1.20000UI - Suspensão injetável
+100480;1;100480 - BENZILPENICILINA BENZATINA - 60000UI - Suspensão injetável
+100523;1;100523 - CEFTRIAXONA - 500mg - Pó para solução injetável / IM
+100550;1;100550 - CLORANFENICOL+COLAGENASE - 0,01G+0,6UI - Pomada
+100730;2;100730 - MEDROXIPROGESTERONA, acetato de - 150mg/mL - Suspensão injetável
+100779;3;100779 - NORETISTERONA, enantato de + ESTRADIOL, valerato de - 50mg + 5mg/mL - Solução injetável
+100847;1;100847 - SULFADIAZINA DE PRATA - 10mg/g - Creme`;
+    </script>
+</body>
+</html>
